@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>投资人对话总结 Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --error: #f85149;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+      line-height: 1.6;
+    }
+    main {
+      width: 100%;
+      max-width: 560px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.02em;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+    }
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 2.5rem;
+      text-align: center;
+      background: var(--surface);
+      transition: border-color 0.2s, background 0.2s;
+      cursor: pointer;
+      position: relative;
+    }
+    .upload-zone:hover, .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.06);
+    }
+    .upload-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    .upload-icon {
+      width: 48px;
+      height: 48px;
+      margin: 0 auto 1rem;
+      opacity: 0.8;
+    }
+    .upload-zone p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+    .upload-zone p strong {
+      color: var(--text);
+    }
+    .file-hint {
+      font-size: 0.8rem;
+      margin-top: 0.5rem;
+      font-family: "JetBrains Mono", monospace;
+    }
+    .btn {
+      font-family: inherit;
+      font-size: 0.95rem;
+      font-weight: 500;
+      padding: 0.75rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      margin-top: 1.5rem;
+      width: 100%;
+    }
+    .btn-primary:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .status.error {
+      display: block;
+      background: rgba(248, 81, 73, 0.15);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      color: var(--error);
+    }
+    .status.success {
+      display: block;
+      background: rgba(63, 185, 80, 0.15);
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      color: var(--success);
+    }
+    .status.loading {
+      display: block;
+      background: rgba(88, 166, 255, 0.1);
+      border: 1px solid var(--border);
+      color: var(--accent);
+    }
+    .selected-file {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .selected-file strong {
+      color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>投资人对话总结 Agent</h1>
+    <p class="subtitle">上传包含投资人与初创团队交流文字的文件，获取结构化分析与 Excel 导出</p>
+
+    <div class="upload-zone" id="zone">
+      <input type="file" id="file" accept=".txt,.md,.pdf,.docx,.html,.htm" />
+      <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="17 8 12 3 7 8" />
+        <line x1="12" y1="3" x2="12" y2="15" />
+      </svg>
+      <p><strong>点击或拖拽文件到此处</strong></p>
+      <p class="file-hint">支持 .txt .md .pdf .docx .html</p>
+      <p class="selected-file" id="selected"></p>
+    </div>
+
+    <button class="btn btn-primary" id="submit" disabled>开始分析</button>
+
+    <div class="status" id="status"></div>
+  </main>
+
+  <script>
+    const zone = document.getElementById("zone");
+    const fileInput = document.getElementById("file");
+    const submitBtn = document.getElementById("submit");
+    const statusEl = document.getElementById("status");
+    const selectedEl = document.getElementById("selected");
+
+    const API_BASE = window.location.origin;
+
+    function setStatus(msg, type) {
+      statusEl.textContent = msg;
+      statusEl.className = "status " + type;
+    }
+
+    function clearStatus() {
+      statusEl.className = "status";
+      statusEl.textContent = "";
+    }
+
+    zone.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      zone.classList.add("dragover");
+    });
+    zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      zone.classList.remove("dragover");
+      const f = e.dataTransfer?.files?.[0];
+      if (f) fileInput.files = e.dataTransfer.files;
+      updateSelected();
+    });
+
+    fileInput.addEventListener("change", updateSelected);
+    function updateSelected() {
+      const f = fileInput.files?.[0];
+      selectedEl.textContent = f ? `已选择: ${f.name}` : "";
+      submitBtn.disabled = !f;
+    }
+
+    submitBtn.addEventListener("click", async () => {
+      const f = fileInput.files?.[0];
+      if (!f) return;
+
+      submitBtn.disabled = true;
+      setStatus("正在分析，请稍候...", "loading");
+
+      const form = new FormData();
+      form.append("file", f);
+
+      try {
+        const res = await fetch(API_BASE + "/api/analyze", {
+          method: "POST",
+          body: form,
+        });
+        const blob = await res.blob();
+
+        if (!res.ok) {
+          const text = await blob.text();
+          let msg = text;
+          try {
+            const j = JSON.parse(text);
+            msg = j.detail || j.message || text;
+          } catch (_) {}
+          throw new Error(msg);
+        }
+
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = (f.name.replace(/\.[^.]+$/, "") || "export") + "_分析结果.xlsx";
+        a.click();
+        URL.revokeObjectURL(a.href);
+
+        setStatus("分析完成，Excel 已下载", "success");
+      } catch (e) {
+        setStatus(e.message || "请求失败，请稍后重试", "error");
+      } finally {
+        submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
