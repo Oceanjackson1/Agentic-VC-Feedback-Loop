@@ -55,8 +55,6 @@ An **Agentic VC Feedback Loop**：将每次投资人对话作为一次 observati
 
 ## 如何启动
 
-> 以下命令中的 `项目目录` 请替换为你本地下载该项目的实际路径。
-
 ### 环境要求
 
 - **Python 3.9+**
@@ -68,7 +66,7 @@ An **Agentic VC Feedback Loop**：将每次投资人对话作为一次 observati
 
 ```bash
 # 1. 进入项目目录
-cd 项目目录
+cd /Users/niyutong/Desktop/投资人对话总结Agent
 
 # 2. 创建虚拟环境
 python3 -m venv venv
@@ -91,7 +89,7 @@ cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ```bash
 # 1. 进入项目目录
-cd 项目目录
+cd /Users/niyutong/Desktop/投资人对话总结Agent
 
 # 2. 安装依赖（若未安装）
 pip install -r backend/requirements.txt
@@ -106,7 +104,7 @@ chmod +x run.sh
 ### 方式三：手动启动
 
 ```bash
-cd 项目目录/backend
+cd /Users/niyutong/Desktop/投资人对话总结Agent/backend
 
 export DEEPSEEK_API_KEY=sk-xxx   # 或通过 .env 配置
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
