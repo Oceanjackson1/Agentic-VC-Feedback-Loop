@@ -1,87 +1,44 @@
-"""DeepSeek 分析模块：单次 API 调用完成全部分析"""
+"""DeepSeek 分析模块：支持多场景 + 长文本分段 + 可选上下文"""
 
 import json
+import logging
 import os
+from typing import Optional
+
 from openai import OpenAI
 
-ANALYSIS_PROMPT = """你是一名一线（Tier 1）风险投资机构的投资合伙人，
-在 Web2 与 Web3 领域都有长期投资与投后经验，
-你经常通过创始团队与投资人的真实交流来判断一个项目是否值得进入下一轮沟通。
+from prompts import get_scenario
 
-现在你将收到一段【完整的文字记录】，内容来自：
-- 投资人与初创团队之间的真实交流
-
-你的任务不是复述内容，
-而是像一名专业 VC 一样，对这段交流进行结构化拆解和判断。
-
-————————
-分析基本定义（必须遵守）：
-
-1. 一个「分析单元」= 投资人提出的一个核心问题
-   - 即使问题分散在多句话中
-   - 即使包含追问，也视为同一个问题
-2. 不构成风险判断的寒暄或肯定性评价可以忽略
-3. 判断重点是：团队是否回答了投资人真正关心的核心问题
-
-————————
-分析目标：
-
-- 还原投资人问题背后的真实动机
-- 判断团队是否有效回应该动机
-- 评估表达、结构与叙事质量
-- 给出下一次更优的回答方式
-- 明确指出产品、叙事或团队准备上的调整方向
-
-————————
-输出格式要求（强制）：
-
-你必须只输出一个 JSON 数组，不得输出任何额外文字。
-
-数组中的每一个对象，代表一个投资人提出的核心问题，
-并且必须严格符合以下结构：
-
-{
-  "question_summary": "一句话总结投资人提出的问题",
-  "investor_core_motive": "分析该问题背后的真实关注点或风险判断",
-  "team_response_assessment": "评估团队是否回答到位，以及原因",
-  "next_time_response_suggestion": "下次更优的回答方式（可直接复述的话术）",
-  "delivery_and_pitch_feedback": "从表达方式、结构或话术角度的改进建议",
-  "required_adjustments": {
-    "product": "产品或业务层面需要调整的地方，没有则写「无」",
-    "narrative": "对外叙事或定位需要调整的地方，没有则写「无」",
-    "team_preparation": "团队准备或认知层面需要补足的地方，没有则写「无」"
-  },
-  "evidence_quotes": [
-    "用于支撑判断的原文引用，必须直接来自文本"
-  ],
-  "severity": "high | medium | low",
-  "ai_recommendation": "基于完整 Pitch + Q&A 的整体判断，说明：该问题应（1）在 Pitch 主线中提前回答、（2）作为 Appendix / Follow-up Material 补充、或（3）仅 Q&A 回答即可；并给出具体改进建议（若提前讲，应在 Pitch 哪个层次；若补充材料，应包含什么关键信息；以及如何更清晰表达）。必须具体可执行，避免泛泛而谈。"
-}
-
-————————
-分析原则（必须遵守）：
-
-- 保持专业、审慎、偏投资决策视角
-- 避免泛泛而谈的创业建议
-- 不要编造文本中不存在的信息
-- 如果团队没有回答问题，必须明确指出
-- evidence_quotes 必须是真实原文
-- severity 表示该问题对投资决策的重要程度
-- ai_recommendation 为基于完整 Pitch + Q&A 的全局前瞻性建议：判断该问题应「在 Pitch 中提前讲」「作为补充材料」或「仅 Q&A 回答」；并给出具体改进建议。不重复已有分析，而是 Pitch 层面的前瞻性建议。
-
-<<<OUTPUT_LANG_INSTRUCTION>>>
-
-————————
-以下是需要分析的文本内容（来自用户上传文件的文本抽取结果）：
-
-<<<TRANSCRIPT>>>
-"""
+logger = logging.getLogger(__name__)
 
 
-def _validate_result(raw: str) -> list[dict]:
-    """校验返回内容为合法 JSON 数组，并校验结构"""
+# ── JSON 修复与校验 ──────────────────────────────────────────
+
+
+def _try_repair_json(raw: str) -> str:
+    """尝试修复被截断的 JSON（未闭合的字符串/数组/对象）"""
+    s = raw.rstrip()
+    try:
+        json.loads(s)
+        return s
+    except json.JSONDecodeError:
+        pass
+
+    last_complete = s.rfind("}")
+    while last_complete > 0:
+        candidate = s[:last_complete + 1].rstrip().rstrip(",") + "\n]"
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            last_complete = s.rfind("}", 0, last_complete)
+
+    return raw
+
+
+def _validate_result(raw: str, scenario_id: str) -> list[dict]:
+    """校验返回内容为合法 JSON 数组，并按场景校验结构"""
     raw = raw.strip()
-    # 去除可能的 markdown 代码块
     if raw.startswith("```"):
         lines = raw.split("\n")
         if lines[0].startswith("```"):
@@ -89,64 +46,165 @@ def _validate_result(raw: str) -> list[dict]:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         raw = "\n".join(lines)
+
+    raw = _try_repair_json(raw)
     data = json.loads(raw)
+
     if not isinstance(data, list):
         raise ValueError("模型返回的不是 JSON 数组")
+
+    scenario = get_scenario(scenario_id)
+
     for i, item in enumerate(data):
         if not isinstance(item, dict):
             raise ValueError(f"第 {i + 1} 项不是对象")
-        required = {
-            "question_summary", "investor_core_motive", "team_response_assessment",
-            "next_time_response_suggestion", "delivery_and_pitch_feedback",
-            "required_adjustments", "evidence_quotes", "severity", "ai_recommendation"
-        }
-        missing = required - set(item.keys())
+        missing = scenario.REQUIRED_FIELDS - set(item.keys())
         if missing:
             raise ValueError(f"第 {i + 1} 项缺少字段: {missing}")
-        adj = item.get("required_adjustments")
-        if not isinstance(adj, dict):
-            raise ValueError(f"第 {i + 1} 项 required_adjustments 必须是对象")
-        for k in ("product", "narrative", "team_preparation"):
-            if k not in adj:
-                raise ValueError(f"第 {i + 1} 项 required_adjustments 缺少 {k}")
+
+        # 校验嵌套调整字段
+        adj_key = None
+        for key in ("required_adjustments", "required_preparation", "follow_up"):
+            if key in scenario.REQUIRED_FIELDS:
+                adj_key = key
+                break
+
+        if adj_key:
+            adj = item.get(adj_key)
+            if not isinstance(adj, dict):
+                raise ValueError(f"第 {i + 1} 项 {adj_key} 必须是对象")
+            for k in scenario.REQUIRED_ADJUSTMENT_FIELDS:
+                if k not in adj:
+                    raise ValueError(f"第 {i + 1} 项 {adj_key} 缺少 {k}")
+
     return data
 
 
-def analyze(transcript: str, output_lang: str = "zh") -> list[dict]:
+# ── 文本分段 ──────────────────────────────────────────
+
+_MAX_INPUT_CHARS = 50000
+_OVERLAP_CHARS = 500
+
+
+def _split_transcript(transcript: str) -> list[str]:
+    """将过长的文本按段落边界分段"""
+    if len(transcript) <= _MAX_INPUT_CHARS:
+        return [transcript]
+
+    chunks = []
+    start = 0
+    while start < len(transcript):
+        end = start + _MAX_INPUT_CHARS
+        if end >= len(transcript):
+            chunks.append(transcript[start:])
+            break
+        split_at = transcript.rfind("\n\n", start + _MAX_INPUT_CHARS // 2, end)
+        if split_at == -1:
+            split_at = transcript.rfind("\n", start + _MAX_INPUT_CHARS // 2, end)
+        if split_at == -1:
+            split_at = end
+        chunks.append(transcript[start:split_at])
+        start = max(start + 1, split_at - _OVERLAP_CHARS)
+
+    logger.info(f"文本过长 ({len(transcript)} 字符)，已分为 {len(chunks)} 段处理")
+    return chunks
+
+
+# ── API 调用 ──────────────────────────────────────────
+
+
+def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
+    """单次 API 调用，含重试逻辑"""
+    for attempt in range(3):
+        try:
+            resp = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=8192,
+                stream=False,
+            )
+            raw = resp.choices[0].message.content or ""
+            finish_reason = resp.choices[0].finish_reason
+            if finish_reason == "length":
+                logger.warning("模型输出因 token 限制被截断，尝试修复 JSON")
+            return _validate_result(raw, scenario_id)
+        except (json.JSONDecodeError, ValueError) as e:
+            logger.warning(f"第 {attempt + 1} 次尝试解析失败: {e}")
+            if attempt == 2:
+                raise RuntimeError(f"模型返回无法解析，已重试 {attempt} 次: {e}")
+            continue
+    return []
+
+
+# ── 主入口 ──────────────────────────────────────────
+
+_CONTEXT_TEMPLATE = """————————
+背景资料（来自用户上传的参考文档）：
+
+{context_text}
+"""
+
+
+def analyze(
+    transcript: str,
+    scenario_id: str = "vc_pitch",
+    output_lang: str = "zh",
+    context_text: Optional[str] = None,
+) -> list[dict]:
     """
-    调用 DeepSeek 原生 API 分析 transcript，
-    返回结构化的 JSON 数组。校验失败时重试 1 次。
-    output_lang: "zh" 输出中文，"en" 输出英文（用于原文为英文时直接分析出英文）
+    调用 DeepSeek API 分析 transcript。
+    - scenario_id: 场景 ID（vc_pitch / ecommerce_b2b / interview / meeting_summary）
+    - output_lang: "zh" 中文 / "en" 英文
+    - context_text: 可选的背景资料文本（来自用户上传的上下文 PDF）
     """
     api_key = os.environ.get("DEEPSEEK_API_KEY")
     if not api_key:
         raise RuntimeError("未配置 DEEPSEEK_API_KEY 环境变量")
 
+    scenario = get_scenario(scenario_id)
+
     if output_lang == "en":
-        lang_instruction = "【重要】文本内容主要为英文。你必须将 JSON 中所有字段的文本值使用英文输出，包括 evidence_quotes 中的引用也需翻译为英文。"
+        lang_instruction = (
+            "【重要】文本内容主要为英文。你必须将 JSON 中所有字段的文本值使用英文输出，"
+            "包括 evidence_quotes 中的引用也需翻译为英文。"
+        )
     else:
         lang_instruction = ""
 
-    prompt = (
-        ANALYSIS_PROMPT.replace("<<<TRANSCRIPT>>>", transcript)
-        .replace("<<<OUTPUT_LANG_INSTRUCTION>>>", lang_instruction)
-    )
+    context_section = ""
+    if context_text and context_text.strip():
+        # 限制上下文长度，避免挤占 transcript 空间
+        max_context_chars = 30000
+        if len(context_text) > max_context_chars:
+            context_text = context_text[:max_context_chars] + "\n\n（背景资料过长，已截断）"
+            logger.warning(f"上下文文本过长，已截断至 {max_context_chars} 字符")
+        context_section = _CONTEXT_TEMPLATE.format(context_text=context_text)
 
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
     )
 
-    for attempt in range(2):
-        try:
-            resp = client.chat.completions.create(
-                model="deepseek-chat",
-                messages=[{"role": "user", "content": prompt}],
-                stream=False,
-            )
-            raw = resp.choices[0].message.content or ""
-            return _validate_result(raw)
-        except (json.JSONDecodeError, ValueError) as e:
-            if attempt == 1:
-                raise RuntimeError(f"模型返回无法解析，已重试 1 次: {e}")
-            continue
+    chunks = _split_transcript(transcript)
+    all_results = []
+
+    for i, chunk in enumerate(chunks):
+        chunk_note = ""
+        if len(chunks) > 1:
+            chunk_note = f"\n\n【注意】这是完整文本的第 {i + 1}/{len(chunks)} 段。请只分析本段中出现的问题。\n"
+            logger.info(f"正在分析第 {i + 1}/{len(chunks)} 段 ({len(chunk)} 字符)")
+
+        prompt = (
+            scenario.ANALYSIS_PROMPT
+            .replace("<<<CONTEXT_SECTION>>>", context_section)
+            .replace("<<<TRANSCRIPT>>>", chunk_note + chunk)
+            .replace("<<<OUTPUT_LANG_INSTRUCTION>>>", lang_instruction)
+        )
+
+        results = _call_deepseek(client, prompt, scenario_id)
+        all_results.extend(results)
+
+    if not all_results:
+        raise RuntimeError("分析结果为空")
+
+    return all_results

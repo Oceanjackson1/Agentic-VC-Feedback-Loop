@@ -14,4 +14,4 @@ if [ -z "$DEEPSEEK_API_KEY" ]; then
 fi
 
 echo "正在启动服务..."
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+python3 -m uvicorn main:app --reload --host 0.0.0.0 --port 8000

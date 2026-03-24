@@ -18,3 +18,11 @@ node_modules/
 # IDE
 .vscode/
 .idea/
+.vercel
+
+# Next.js
+.next/
+.env.local
+
+# Claude Code
+.claude/
