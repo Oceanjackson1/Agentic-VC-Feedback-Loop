@@ -10,7 +10,7 @@ from openai import OpenAI
 from prompts import get_scenario
 
 logger = logging.getLogger(__name__)
-logger.info("analyzer.py loaded - timeout=300s, max_tokens=16384, chunk=6000")
+logger.info("analyzer.py loaded - timeout=300s, max_tokens=8192, chunk=6000")
 
 
 # ── JSON 修复与校验 ──────────────────────────────────────────
@@ -132,7 +132,7 @@ def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
         resp = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=16384,
+            max_tokens=8192,
             stream=False,
         )
         raw = resp.choices[0].message.content or ""
