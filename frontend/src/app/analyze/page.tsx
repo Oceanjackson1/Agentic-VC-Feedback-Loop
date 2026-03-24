@@ -60,14 +60,14 @@ function AnalyzeContent() {
 
     try {
       // Step 1: Extract
-      setProgress({ step: "extracting", chunksTotal: 0, chunksCompleted: 0, message: "正在提取文本..." });
+      setProgress({ step: "extracting", chunksTotal: 0, chunksCompleted: 0, message: "正在分析中..." });
       const extracted = await extractFile(file, scenario, language, contextFile);
 
       if (abortRef.current) return;
 
       // Step 2: Analyze chunks one by one
       const { chunks, total_chunks, is_english_source, context_text, output_lang } = extracted;
-      setProgress({ step: "analyzing", chunksTotal: total_chunks, chunksCompleted: 0, message: `正在分析 0/${total_chunks}...` });
+      setProgress({ step: "analyzing", chunksTotal: total_chunks, chunksCompleted: 0, message: "正在分析中... 0%" });
 
       const allResults: Record<string, unknown>[] = [];
       const failedChunks: number[] = [];
@@ -75,10 +75,11 @@ function AnalyzeContent() {
       for (let i = 0; i < chunks.length; i++) {
         if (abortRef.current) return;
 
+        const pct = Math.round((i / total_chunks) * 100);
         setProgress(prev => ({
           ...prev,
           chunksCompleted: i,
-          message: `正在分析第 ${i + 1}/${total_chunks} 段...`,
+          message: `正在分析中... ${pct}%`,
         }));
 
         try {
@@ -99,21 +100,19 @@ function AnalyzeContent() {
         setProgress(prev => ({
           ...prev,
           chunksCompleted: i + 1,
-          message: failedChunks.includes(i)
-            ? `第 ${i + 1} 段分析失败，继续处理...`
-            : `已完成 ${i + 1}/${total_chunks} 段`,
+          message: `正在分析中... ${Math.round(((i + 1) / total_chunks) * 100)}%`,
         }));
       }
 
       if (allResults.length === 0) {
-        setProgress({ step: "error", chunksTotal: total_chunks, chunksCompleted: total_chunks, message: "所有段落分析失败，请稍后重试" });
+        setProgress({ step: "error", chunksTotal: total_chunks, chunksCompleted: total_chunks, message: "分析失败，请稍后重试" });
         return;
       }
 
       if (abortRef.current) return;
 
       // Step 3: Export
-      setProgress(prev => ({ ...prev, step: "exporting", message: "正在生成 Excel..." }));
+      setProgress(prev => ({ ...prev, step: "exporting", message: "正在生成报告..." }));
       const blob = await exportExcel({
         results: allResults,
         language,
@@ -131,7 +130,7 @@ function AnalyzeContent() {
       URL.revokeObjectURL(a.href);
 
       const warning = failedChunks.length > 0
-        ? `（${failedChunks.length} 段分析失败，结果可能不完整）`
+        ? "（部分内容分析失败，结果可能不完整）"
         : "";
       setProgress(prev => ({
         ...prev,
@@ -317,18 +316,13 @@ function AnalyzeContent() {
                   {progress.message}
                 </div>
 
-                {/* Progress bar for analyzing step */}
+                {/* Progress bar */}
                 {progress.step === "analyzing" && progress.chunksTotal > 0 && (
-                  <div className="space-y-1">
-                    <div className="w-full bg-border rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-accent h-2 rounded-full transition-all duration-500 ease-out"
-                        style={{ width: `${progressPercent}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-text-tertiary text-right">
-                      {progress.chunksCompleted}/{progress.chunksTotal} 段 · {progressPercent}%
-                    </p>
+                  <div className="w-full bg-border rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-accent h-1.5 rounded-full transition-all duration-500 ease-out"
+                      style={{ width: `${progressPercent}%` }}
+                    />
                   </div>
                 )}
               </div>
