@@ -1,204 +1,118 @@
-# 投资人对话总结 Agent
+# DialogAI - 多场景对话分析平台
 
-An **Agentic VC Feedback Loop**：将每次投资人对话作为一次 observation，通过 multi-step reasoning 建模投资人问题背后的决策逻辑，输出 decision artifacts，支撑创始团队持续 refine 产品、叙事与沟通策略。
+AI 驱动的对话分析平台，支持多种场景的结构化分析与 Excel 报告导出。
 
----
-
-## 系统定位
-
-### 这不是什么
-
-本系统**不是**：chatbot、summarizer、transcription tool 或 simple analysis script。  
-它**不**旨在「总结投资人说了什么」。
-
-### 这是什么
-
-一个 **Agentic System**，具备：
-
-- **explicit role assumption**：Tier-1 VC 视角（Web2 & Web3 投资与投后）
-- **multi-step reasoning**：从表面问题反推 investor core motive，评估 team response，给出 actionable feedback
-- **decision feedback loop**：每一次投资人通话 = loop 中的一次 observation；输出的 Excel 不是报告，而是 **decision artifacts**
-
-### 设计目标
-
-- **建模「投资人为什么这样问」**，而非复述「投资人问了什么」
-- 通过可累积的 decision artifacts，帮助团队在多次迭代中持续 refine：
-  - 产品方向（product）
-  - 对外叙事（narrative）
-  - 投资人沟通策略（team preparation）
+**线上地址**：https://meetingnotes.cyou
 
 ---
 
-## Agentic Flow
+## 功能特性
 
-单次调用完成一次 loop 迭代：
+### 四大分析场景
 
-1. **Observation 输入**：上传包含投资人与团队交流文字的文件（.txt / .md / .pdf / .docx / .html）
-2. **Text Extraction**：后端抽取纯文本（不处理音频、图片、扫描件）
-3. **Reasoning**：DeepSeek 原生 API 单次调用，完成全部分析
-4. **Artifact 输出**：导出 Excel，每行 = 一个投资人核心问题，列对应结构化分析字段
-5. **Download**：用户下载 decision artifacts，用于后续复盘与策略调整
+| 场景 | 说明 |
+|------|------|
+| **VC Pitch 反馈** | 分析投资人与创始团队的对话，还原问题背后的真实动机，评估回答质量 |
+| **电商 B2B 对谈** | 分析采购方与供应商的谈判对话，提取关键诉求，优化报价话术 |
+| **面试分析** | 分析面试对话，识别考察维度，评估回答表现，提供改进建议 |
+| **会议总结** | 结构化会议纪要，提取决策、行动项，自动分配责任人和时间节点 |
 
-### 支持的文件类型
+### 核心能力
 
-| 扩展名 | 说明 |
-|--------|------|
-| .txt   | 纯文本 |
-| .md    | Markdown |
-| .pdf   | 可直接提取文本的 PDF（不处理扫描版） |
-| .docx  | Word 文档 |
-| .html  | 网页/HTML |
-
-> 注意：文件需为可解析为纯文本的格式。扫描版 PDF、图片、音频等不支持。
+- Google OAuth 登录
+- 上传对话文件（PDF / Word / TXT）
+- 可选上传背景资料 PDF 作为分析上下文
+- AI 分析（DeepSeek API）
+- 中英文 Excel 报告导出
 
 ---
 
-## 如何启动
-
-### 环境要求
-
-- **Python 3.9+**
-- **DeepSeek API Key**（从 [platform.deepseek.com](https://platform.deepseek.com) 获取）
-
-### 方式一：使用虚拟环境（推荐）
-
-避免与系统 Python 或 Anaconda 环境冲突，建议使用 `venv`：
-
-```bash
-# 1. 进入项目目录
-cd /Users/niyutong/Desktop/投资人对话总结Agent
-
-# 2. 创建虚拟环境
-python3 -m venv venv
-
-# 3. 激活虚拟环境
-source venv/bin/activate   # macOS / Linux
-# 或 Windows: venv\Scripts\activate
-
-# 4. 安装依赖
-pip install -r backend/requirements.txt
-
-# 5. 配置 API Key（若尚未配置）
-# 编辑 .env 文件，填入 DEEPSEEK_API_KEY=sk-xxx
-
-# 6. 启动服务
-cd backend && uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 方式二：使用启动脚本
-
-```bash
-# 1. 进入项目目录
-cd /Users/niyutong/Desktop/投资人对话总结Agent
-
-# 2. 安装依赖（若未安装）
-pip install -r backend/requirements.txt
-
-# 3. 确保 .env 中已配置 DEEPSEEK_API_KEY
-
-# 4. 添加执行权限并启动
-chmod +x run.sh
-./run.sh
-```
-
-### 方式三：手动启动
-
-```bash
-cd /Users/niyutong/Desktop/投资人对话总结Agent/backend
-
-export DEEPSEEK_API_KEY=sk-xxx   # 或通过 .env 配置
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
-
-### 访问产品
-
-启动成功后，终端会显示：
+## 技术架构
 
 ```
-INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+meetingnotes.cyou (Vercel)
+├── Next.js 14 前端（React + TypeScript + Tailwind CSS）
+├── Python Serverless API（FastAPI）
+└── Supabase PostgreSQL（数据库）
 ```
 
-在浏览器中打开：**http://localhost:8000**
-
-### 停止服务
-
-在运行 uvicorn 的终端中按 **Ctrl + C** 即可停止服务。
-
-### 重新启动
-
-若已关闭终端，重新打开一个新终端，按上述「方式一」或「方式二」再次执行启动命令即可。
-
----
-
-## 配置说明
-
-### API Key 配置
-
-1. 复制示例配置：
-   ```bash
-   cp .env.example .env
-   ```
-
-2. 编辑 `.env`，填入你的 DeepSeek API Key：
-   ```
-   DEEPSEEK_API_KEY=sk-你的密钥
-   ```
-
-> API Key 仅存在于服务端环境变量中，不会暴露给前端。
-
----
-
-## 项目结构
+### 项目结构
 
 ```
-投资人对话总结Agent/
+├── vercel.json              # Vercel 部署配置
+├── requirements.txt         # Python 依赖
+├── api/
+│   └── index.py             # Vercel Serverless 入口
 ├── backend/
-│   ├── main.py         # FastAPI 入口，上传→分析→下载
-│   ├── extractors.py   # 文本抽取（txt/md/pdf/docx/html）
-│   ├── analyzer.py     # DeepSeek API 调用
-│   ├── excel_export.py # Excel 导出
-│   └── requirements.txt
+│   ├── main.py              # FastAPI 应用
+│   ├── config.py            # 环境变量配置
+│   ├── database.py          # SQLAlchemy 数据库连接
+│   ├── models.py            # 数据模型（User, AnalysisRecord）
+│   ├── analyzer.py          # DeepSeek API 调用
+│   ├── extractors.py        # 文件文本抽取
+│   ├── excel_export.py      # Excel 导出
+│   ├── translator.py        # 中英文翻译
+│   ├── auth/                # Google OAuth + JWT 认证
+│   ├── routers/             # API 路由
+│   └── prompts/             # 各场景 LLM 提示词
 ├── frontend/
-│   └── index.html      # 上传与下载 UI
-├── .env                # 环境变量（含 API Key，勿提交）
-├── .env.example        # 环境变量示例
-├── run.sh              # 启动脚本
-└── README.md
+│   ├── src/app/             # Next.js App Router 页面
+│   ├── src/components/      # React 组件
+│   ├── src/lib/             # API 客户端、Auth 工具
+│   └── public/              # 静态资源（logo、favicon）
+└── lib/                     # 共享 Python 工具库
 ```
 
 ---
 
-## 使用流程
+## 部署
 
-1. 在页面中**上传**一个包含投资人与团队交流文字的文件
-2. 点击 **「开始分析」**
-3. 等待分析完成（通常需 10–30 秒）
-4. **下载**生成的 Excel 文件（文件名格式：`原文件名_分析结果.xlsx`）
+### 环境变量
 
----
+| 变量 | 说明 |
+|------|------|
+| `DEEPSEEK_API_KEY` | DeepSeek API 密钥 |
+| `DATABASE_URL` | Supabase PostgreSQL 连接字符串 |
+| `JWT_SECRET` | JWT 签名密钥 |
+| `GOOGLE_CLIENT_ID` | Google OAuth 客户端 ID |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 客户端密钥 |
+| `ALLOWED_ORIGINS` | CORS 允许的域名 |
+| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | 前端 Google 客户端 ID |
 
-## 常见问题
+### Vercel 一键部署
 
-### 出现 Intel MKL 错误
+项目配置为单个 Vercel 项目同时部署前端和后端：
 
-若使用 Anaconda 时出现 `Intel MKL FATAL ERROR: Cannot load libmkl_core.1.dylib`，建议改用 **方式一（venv）** 启动，可避免该问题。
-
-### 上传后报 Internal Server Error
-
-1. 查看运行 uvicorn 的终端中的报错信息
-2. 确认 `.env` 中 `DEEPSEEK_API_KEY` 已正确配置
-3. 尝试上传 .txt 文件测试，以区分是文件解析问题还是 API 调用问题
-
-### PDF 无法解析
-
-仅支持**可直接提取文本**的 PDF。扫描版 PDF 会提示「该 PDF 无法解析为文本（可能是扫描版）」。
+1. 在 Vercel 导入本仓库
+2. 在 Settings → Environment Variables 中添加以上环境变量
+3. 部署完成
 
 ---
 
-## 成功标准自检
+## 本地开发
 
-- [x] 支持 .txt / .md / .pdf / .docx / .html
-- [x] 正确抽取文本并完成分析
-- [x] Excel 可正常下载并打开
-- [x] Excel 每行对应一个投资人核心问题
-- [x] 内容体现 VC 判断逻辑，非泛化建议
+```bash
+# 1. 克隆并安装后端依赖
+git clone https://github.com/Oceanjackson1/Agentic-VC-Feedback-Loop.git
+cd Agentic-VC-Feedback-Loop
+python3 -m venv venv && source venv/bin/activate
+pip install -r backend/requirements.txt
+
+# 2. 配置环境变量
+cp .env.example .env
+# 编辑 .env 填入各项密钥
+
+# 3. 启动后端
+cd backend && uvicorn main:app --reload --port 8000
+
+# 4. 启动前端（新终端）
+cd frontend && npm install && npm run dev
+```
+
+访问 http://localhost:3000
+
+---
+
+## 开发者
+
+Built by [Ocean](https://x.com/Ocean_Jackon)
