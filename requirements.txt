@@ -10,3 +10,4 @@ SQLAlchemy==2.0.36
 psycopg2-binary==2.9.10
 PyJWT==2.10.1
 httpx==0.28.1
+uvicorn[standard]==0.32.1
