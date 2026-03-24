@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 def _try_repair_json(raw: str) -> str:
-    """尝试修复被截断的 JSON（未闭合的字符串/数组/对象）"""
+    """尝试修复被截断的 JSON 数组，尽量保留所有完整的对象项"""
     s = raw.rstrip()
     try:
         json.loads(s)
@@ -24,6 +24,18 @@ def _try_repair_json(raw: str) -> str:
     except json.JSONDecodeError:
         pass
 
+    # 优先：找最后一个 "}," 模式（完整项的结束 + 下一项开始前）
+    # 这样能保留尽可能多的完整项
+    last_item_end = s.rfind("},")
+    if last_item_end > 0:
+        candidate = s[:last_item_end + 1] + "\n]"
+        try:
+            json.loads(candidate)
+            return candidate
+        except json.JSONDecodeError:
+            pass
+
+    # 回退：从后往前找 "}" 尝试闭合
     last_complete = s.rfind("}")
     while last_complete > 0:
         candidate = s[:last_complete + 1].rstrip().rstrip(",") + "\n]"
@@ -82,7 +94,7 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
 # ── 文本分段 ──────────────────────────────────────────
 
-_MAX_INPUT_CHARS = 15000
+_MAX_INPUT_CHARS = 6000
 _OVERLAP_CHARS = 500
 
 
@@ -119,7 +131,7 @@ def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
         resp = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=8192,
+            max_tokens=16384,
             stream=False,
         )
         raw = resp.choices[0].message.content or ""
