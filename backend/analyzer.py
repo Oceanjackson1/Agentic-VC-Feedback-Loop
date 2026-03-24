@@ -82,7 +82,7 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
 # ── 文本分段 ──────────────────────────────────────────
 
-_MAX_INPUT_CHARS = 12000
+_MAX_INPUT_CHARS = 50000
 _OVERLAP_CHARS = 500
 
 
@@ -209,3 +209,57 @@ def analyze(
         raise RuntimeError("分析结果为空")
 
     return all_results
+
+
+# ── 公开接口：供分步 API 调用 ──────────────────────────────────
+
+
+def split_transcript(transcript: str) -> list[str]:
+    """公开的文本分段接口"""
+    return _split_transcript(transcript)
+
+
+def analyze_single_chunk(
+    chunk: str,
+    chunk_index: int,
+    total_chunks: int,
+    scenario_id: str,
+    output_lang: str = "zh",
+    context_text: str | None = None,
+) -> list[dict]:
+    """分析单个文本块（供分步 API 使用）"""
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        raise RuntimeError("未配置 DEEPSEEK_API_KEY 环境变量")
+
+    scenario = get_scenario(scenario_id)
+
+    lang_instruction = ""
+    if output_lang == "en":
+        lang_instruction = (
+            "【重要】文本内容主要为英文。你必须将 JSON 中所有字段的文本值使用英文输出，"
+            "包括 evidence_quotes 中的引用也需翻译为英文。"
+        )
+
+    context_section = ""
+    if context_text and context_text.strip():
+        context_section = _CONTEXT_TEMPLATE.format(context_text=context_text)
+
+    chunk_note = ""
+    if total_chunks > 1:
+        chunk_note = f"\n\n【注意】这是完整文本的第 {chunk_index + 1}/{total_chunks} 段。请只分析本段中出现的问题。\n"
+
+    prompt = (
+        scenario.ANALYSIS_PROMPT
+        .replace("<<<CONTEXT_SECTION>>>", context_section)
+        .replace("<<<TRANSCRIPT>>>", chunk_note + chunk)
+        .replace("<<<OUTPUT_LANG_INSTRUCTION>>>", lang_instruction)
+    )
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.deepseek.com",
+        timeout=50.0,
+    )
+
+    return _call_deepseek(client, prompt, scenario_id)

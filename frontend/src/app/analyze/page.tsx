@@ -5,7 +5,25 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { AudioGuidePanel } from "@/components/AudioGuidePanel";
 import { OutputPreview } from "@/components/OutputPreview";
-import { analyzeFile } from "@/lib/api";
+import { extractFile, analyzeChunk, exportExcel } from "@/lib/api";
+
+type ProgressStep = "idle" | "extracting" | "analyzing" | "exporting" | "done" | "error";
+
+interface Progress {
+  step: ProgressStep;
+  chunksTotal: number;
+  chunksCompleted: number;
+  message: string;
+}
+
+const STEP_LABELS: Record<ProgressStep, string> = {
+  idle: "",
+  extracting: "正在提取文本...",
+  analyzing: "正在分析",
+  exporting: "正在生成 Excel...",
+  done: "分析完成，Excel 已下载",
+  error: "",
+};
 
 function AnalyzeContent() {
   const searchParams = useSearchParams();
@@ -17,11 +35,13 @@ function AnalyzeContent() {
   const [file, setFile] = useState<File | null>(null);
   const [contextFile, setContextFile] = useState<File | null>(null);
   const [language, setLanguage] = useState<"zh" | "en">("zh");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [message, setMessage] = useState("");
+  const [progress, setProgress] = useState<Progress>({
+    step: "idle", chunksTotal: 0, chunksCompleted: 0, message: "",
+  });
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const ctxRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef(false);
 
   useEffect(() => {
     if (!loading && !user) router.push("/");
@@ -36,24 +56,109 @@ function AnalyzeContent() {
 
   const handleSubmit = async () => {
     if (!file) return;
-    setStatus("loading");
-    setMessage(language === "en" ? "正在分析并翻译，请稍候..." : "正在分析，请稍候...");
+    abortRef.current = false;
 
     try {
-      const blob = await analyzeFile(file, scenario, language, contextFile);
+      // Step 1: Extract
+      setProgress({ step: "extracting", chunksTotal: 0, chunksCompleted: 0, message: "正在提取文本..." });
+      const extracted = await extractFile(file, scenario, language, contextFile);
+
+      if (abortRef.current) return;
+
+      // Step 2: Analyze chunks one by one
+      const { chunks, total_chunks, is_english_source, context_text, output_lang } = extracted;
+      setProgress({ step: "analyzing", chunksTotal: total_chunks, chunksCompleted: 0, message: `正在分析 0/${total_chunks}...` });
+
+      const allResults: Record<string, unknown>[] = [];
+      const failedChunks: number[] = [];
+
+      for (let i = 0; i < chunks.length; i++) {
+        if (abortRef.current) return;
+
+        setProgress(prev => ({
+          ...prev,
+          message: `正在分析第 ${i + 1}/${total_chunks} 段...`,
+        }));
+
+        // Try with 1 retry
+        let success = false;
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const result = await analyzeChunk({
+              chunk: chunks[i],
+              chunk_index: i,
+              total_chunks,
+              scenario,
+              output_lang,
+              context_text,
+            });
+            allResults.push(...result.results);
+            success = true;
+            break;
+          } catch (e) {
+            if (attempt === 1) {
+              console.warn(`Chunk ${i} failed after retry:`, e);
+              failedChunks.push(i);
+            }
+          }
+        }
+
+        setProgress(prev => ({
+          ...prev,
+          chunksCompleted: prev.chunksCompleted + 1,
+          message: success
+            ? `已完成 ${i + 1}/${total_chunks} 段`
+            : `第 ${i + 1} 段分析失败，继续处理...`,
+        }));
+      }
+
+      if (allResults.length === 0) {
+        setProgress({ step: "error", chunksTotal: total_chunks, chunksCompleted: total_chunks, message: "所有段落分析失败，请稍后重试" });
+        return;
+      }
+
+      if (abortRef.current) return;
+
+      // Step 3: Export
+      setProgress(prev => ({ ...prev, step: "exporting", message: "正在生成 Excel..." }));
+      const blob = await exportExcel({
+        results: allResults,
+        language,
+        scenario,
+        is_english_source,
+        filename: file.name,
+      });
+
+      // Download
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
       const baseName = file.name.replace(/\.[^.]+$/, "") || "export";
       a.download = language === "en" ? `${baseName}_analysis_result.xlsx` : `${baseName}_分析结果.xlsx`;
       a.click();
       URL.revokeObjectURL(a.href);
-      setStatus("success");
-      setMessage("分析完成，Excel 已下载");
+
+      const warning = failedChunks.length > 0
+        ? `（${failedChunks.length} 段分析失败，结果可能不完整）`
+        : "";
+      setProgress(prev => ({
+        ...prev,
+        step: "done",
+        message: `分析完成，Excel 已下载${warning}`,
+      }));
+
     } catch (e: unknown) {
-      setStatus("error");
-      setMessage(e instanceof Error ? e.message : "请求失败，请稍后重试");
+      setProgress(prev => ({
+        ...prev,
+        step: "error",
+        message: e instanceof Error ? e.message : "请求失败，请稍后重试",
+      }));
     }
   };
+
+  const isProcessing = ["extracting", "analyzing", "exporting"].includes(progress.step);
+  const progressPercent = progress.chunksTotal > 0
+    ? Math.round((progress.chunksCompleted / progress.chunksTotal) * 100)
+    : 0;
 
   if (loading || !user) return null;
 
@@ -184,29 +289,48 @@ function AnalyzeContent() {
 
             {/* Submit */}
             <button
-              onClick={handleSubmit}
-              disabled={!file || status === "loading"}
-              className="w-full py-3.5 rounded-full font-semibold text-sm transition-all duration-200
-                         bg-text text-bg hover:bg-text/90
-                         disabled:opacity-30 disabled:cursor-not-allowed
-                         hover:shadow-md"
+              onClick={isProcessing ? () => { abortRef.current = true; } : handleSubmit}
+              disabled={!file && !isProcessing}
+              className={`w-full py-3.5 rounded-full font-semibold text-sm transition-all duration-200
+                         ${isProcessing
+                           ? "bg-error/10 text-error hover:bg-error/20 border border-error/30"
+                           : "bg-text text-bg hover:bg-text/90 hover:shadow-md"
+                         }
+                         disabled:opacity-30 disabled:cursor-not-allowed`}
             >
-              {status === "loading" ? "分析中..." : "开始分析"}
+              {isProcessing ? "取消分析" : "开始分析"}
             </button>
 
-            {/* Status */}
-            {status !== "idle" && (
+            {/* Progress */}
+            {progress.step !== "idle" && (
               <div
-                className={`p-4 rounded-xl text-sm font-medium flex items-center gap-3
-                  ${status === "loading" ? "bg-card text-text-secondary" : ""}
-                  ${status === "success" ? "bg-success-light text-success" : ""}
-                  ${status === "error" ? "bg-error-light text-error" : ""}
+                className={`p-4 rounded-xl text-sm font-medium space-y-3
+                  ${isProcessing ? "bg-card text-text-secondary" : ""}
+                  ${progress.step === "done" ? "bg-success-light text-success" : ""}
+                  ${progress.step === "error" ? "bg-error-light text-error" : ""}
                 `}
               >
-                {status === "loading" && (
-                  <div className="w-4 h-4 border-2 border-border-strong border-t-accent rounded-full animate-spin-slow shrink-0" />
+                <div className="flex items-center gap-3">
+                  {isProcessing && (
+                    <div className="w-4 h-4 border-2 border-border-strong border-t-accent rounded-full animate-spin-slow shrink-0" />
+                  )}
+                  {progress.message}
+                </div>
+
+                {/* Progress bar for analyzing step */}
+                {progress.step === "analyzing" && progress.chunksTotal > 1 && (
+                  <div className="space-y-1">
+                    <div className="w-full bg-border rounded-full h-2 overflow-hidden">
+                      <div
+                        className="bg-accent h-2 rounded-full transition-all duration-500 ease-out"
+                        style={{ width: `${progressPercent}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-text-tertiary text-right">
+                      {progress.chunksCompleted}/{progress.chunksTotal} 段 · {progressPercent}%
+                    </p>
+                  </div>
                 )}
-                {message}
               </div>
             )}
           </div>
