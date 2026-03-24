@@ -77,38 +77,31 @@ function AnalyzeContent() {
 
         setProgress(prev => ({
           ...prev,
+          chunksCompleted: i,
           message: `正在分析第 ${i + 1}/${total_chunks} 段...`,
         }));
 
-        // Try with 1 retry
-        let success = false;
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const result = await analyzeChunk({
-              chunk: chunks[i],
-              chunk_index: i,
-              total_chunks,
-              scenario,
-              output_lang,
-              context_text,
-            });
-            allResults.push(...result.results);
-            success = true;
-            break;
-          } catch (e) {
-            if (attempt === 1) {
-              console.warn(`Chunk ${i} failed after retry:`, e);
-              failedChunks.push(i);
-            }
-          }
+        try {
+          const result = await analyzeChunk({
+            chunk: chunks[i],
+            chunk_index: i,
+            total_chunks,
+            scenario,
+            output_lang,
+            context_text: context_text ? context_text.slice(0, 5000) : null,
+          });
+          allResults.push(...result.results);
+        } catch (e) {
+          console.warn(`Chunk ${i} failed:`, e);
+          failedChunks.push(i);
         }
 
         setProgress(prev => ({
           ...prev,
-          chunksCompleted: prev.chunksCompleted + 1,
-          message: success
-            ? `已完成 ${i + 1}/${total_chunks} 段`
-            : `第 ${i + 1} 段分析失败，继续处理...`,
+          chunksCompleted: i + 1,
+          message: failedChunks.includes(i)
+            ? `第 ${i + 1} 段分析失败，继续处理...`
+            : `已完成 ${i + 1}/${total_chunks} 段`,
         }));
       }
 
@@ -318,7 +311,7 @@ function AnalyzeContent() {
                 </div>
 
                 {/* Progress bar for analyzing step */}
-                {progress.step === "analyzing" && progress.chunksTotal > 1 && (
+                {progress.step === "analyzing" && progress.chunksTotal > 0 && (
                   <div className="space-y-1">
                     <div className="w-full bg-border rounded-full h-2 overflow-hidden">
                       <div

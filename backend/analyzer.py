@@ -243,7 +243,9 @@ def analyze_single_chunk(
 
     context_section = ""
     if context_text and context_text.strip():
-        context_section = _CONTEXT_TEMPLATE.format(context_text=context_text)
+        # 限制上下文长度，避免 prompt 过大导致响应慢
+        ctx = context_text[:5000] if len(context_text) > 5000 else context_text
+        context_section = _CONTEXT_TEMPLATE.format(context_text=ctx)
 
     chunk_note = ""
     if total_chunks > 1:
