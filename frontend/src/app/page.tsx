@@ -140,7 +140,7 @@ export default function Home() {
               <span className="text-3xl font-bold">免费</span>
             </div>
             <p className="text-sm text-text-secondary mb-6">通过邀请加入的用户可永久免费使用</p>
-            <ul className="space-y-2.5 text-sm text-text-secondary mb-8">
+            <ul className="space-y-2.5 text-sm text-text-secondary mb-8 flex-1">
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>全部 4 个分析场景</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>上下文 PDF 上传</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>中英文 Excel 导出</li>
@@ -149,7 +149,7 @@ export default function Home() {
             {user ? (
               <button
                 onClick={() => router.push("/dashboard")}
-                className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors"
+                className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors mt-auto"
               >
                 进入看板
               </button>
@@ -167,13 +167,13 @@ export default function Home() {
               <span className="text-sm text-text-tertiary">/ 月</span>
             </div>
             <p className="text-sm text-text-secondary mb-6">适合个人用户和小团队的日常使用</p>
-            <ul className="space-y-2.5 text-sm text-text-secondary mb-8">
+            <ul className="space-y-2.5 text-sm text-text-secondary mb-8 flex-1">
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>全部功能无限制</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>不限分析次数</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>优先处理队列</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>分析历史记录</li>
             </ul>
-            <button className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors">
+            <button className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors mt-auto">
               开始订阅
             </button>
           </div>
@@ -187,13 +187,13 @@ export default function Home() {
             </div>
             <p className="text-sm text-text-secondary mb-1">相当于 $8.25/月</p>
             <p className="text-xs text-accent font-medium mb-5">节省 17%</p>
-            <ul className="space-y-2.5 text-sm text-text-secondary mb-8">
+            <ul className="space-y-2.5 text-sm text-text-secondary mb-8 flex-1">
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>月订阅全部权益</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>年度价格锁定</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>团队协作功能（即将推出）</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>专属客户支持</li>
             </ul>
-            <button className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors">
+            <button className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors mt-auto">
               开始订阅
             </button>
           </div>
