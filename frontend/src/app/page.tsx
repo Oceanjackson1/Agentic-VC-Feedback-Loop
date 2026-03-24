@@ -16,11 +16,7 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard");
-    }
-  }, [user, loading, router]);
+  // 已登录用户可以浏览首页，通过 header "进入看板" 按钮进入 dashboard
 
   if (loading) {
     return (
@@ -48,7 +44,16 @@ export default function Home() {
           </nav>
           {/* Right: Actions */}
           <div className="flex items-center gap-3">
-            <GoogleLoginButton variant="header" />
+            {user ? (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="px-4 py-1.5 rounded-full bg-text text-bg text-sm font-medium hover:bg-text/90 transition-colors"
+              >
+                进入看板
+              </button>
+            ) : (
+              <GoogleLoginButton variant="header" />
+            )}
           </div>
         </div>
       </header>

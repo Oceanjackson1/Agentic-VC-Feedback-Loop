@@ -161,15 +161,22 @@ function AnalyzeContent() {
       <header className="sticky top-0 z-50 bg-bg/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <div className="flex items-center gap-4">
+            <h1
+              className="flex items-center gap-2 text-lg font-bold tracking-tight text-text cursor-pointer shrink-0"
+              onClick={() => router.push("/")}
+            >
+              <img src="/logo.png" alt="DialogAI" className="h-7 w-7 object-contain" />
+              DialogAI
+            </h1>
+            <span className="text-border-strong">/</span>
             <button
               onClick={() => router.push("/dashboard")}
-              className="text-text-tertiary hover:text-text transition-colors"
+              className="text-sm text-text-secondary hover:text-text transition-colors"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
+              看板
             </button>
-            <h1 className="text-lg font-semibold">{SCENARIO_NAMES[scenario] || scenario}</h1>
+            <span className="text-border-strong">/</span>
+            <span className="text-sm font-medium text-text">{SCENARIO_NAMES[scenario] || scenario}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-text-secondary">{user.name || user.email}</span>

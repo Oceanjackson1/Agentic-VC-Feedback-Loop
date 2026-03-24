@@ -32,7 +32,7 @@ export default function DashboardPage() {
         <div className="max-w-6xl mx-auto px-6 h-14 flex items-center justify-between">
           <h1
             className="flex items-center gap-2 text-lg font-bold tracking-tight text-text cursor-pointer"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/")}
           >
             <img src="/logo.png" alt="DialogAI" className="h-7 w-7 object-contain" />
             DialogAI
