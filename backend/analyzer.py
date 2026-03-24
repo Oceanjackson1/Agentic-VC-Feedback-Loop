@@ -82,7 +82,7 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
 # ── 文本分段 ──────────────────────────────────────────
 
-_MAX_INPUT_CHARS = 50000
+_MAX_INPUT_CHARS = 8000
 _OVERLAP_CHARS = 500
 
 
