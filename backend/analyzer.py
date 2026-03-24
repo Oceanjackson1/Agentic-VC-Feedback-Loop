@@ -192,7 +192,7 @@ def analyze(
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=45.0,
+        timeout=300.0,
     )
 
     chunks = _split_transcript(transcript)
@@ -270,7 +270,7 @@ def analyze_single_chunk(
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=45.0,
+        timeout=300.0,
     )
 
     return _call_deepseek(client, prompt, scenario_id)
