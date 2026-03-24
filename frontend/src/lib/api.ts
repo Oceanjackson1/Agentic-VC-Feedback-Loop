@@ -1,4 +1,4 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "https://agentic-vc-feedback-loop-production.up.railway.app";
 
 function getToken(): string | null {
   if (typeof window === "undefined") return null;
