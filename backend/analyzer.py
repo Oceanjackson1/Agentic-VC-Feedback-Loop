@@ -114,13 +114,13 @@ def _split_transcript(transcript: str) -> list[str]:
 
 
 def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
-    """单次 API 调用，含重试逻辑"""
-    for attempt in range(3):
+    """单次 API 调用，仅 1 次重试（总共最多 2 次，适配 Vercel 60s 限制）"""
+    for attempt in range(2):
         try:
             resp = client.chat.completions.create(
                 model="deepseek-chat",
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=8192,
+                max_tokens=4096,
                 stream=False,
             )
             raw = resp.choices[0].message.content or ""
@@ -130,8 +130,8 @@ def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
             return _validate_result(raw, scenario_id)
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"第 {attempt + 1} 次尝试解析失败: {e}")
-            if attempt == 2:
-                raise RuntimeError(f"模型返回无法解析，已重试 {attempt} 次: {e}")
+            if attempt == 1:
+                raise RuntimeError(f"模型返回无法解析: {e}")
             continue
     return []
 
@@ -183,7 +183,7 @@ def analyze(
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=50.0,
+        timeout=25.0,
     )
 
     chunks = _split_transcript(transcript)
@@ -259,7 +259,7 @@ def analyze_single_chunk(
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
-        timeout=50.0,
+        timeout=25.0,
     )
 
     return _call_deepseek(client, prompt, scenario_id)
