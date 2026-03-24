@@ -82,7 +82,7 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
 # ── 文本分段 ──────────────────────────────────────────
 
-_MAX_INPUT_CHARS = 50000
+_MAX_INPUT_CHARS = 12000
 _OVERLAP_CHARS = 500
 
 
@@ -183,6 +183,7 @@ def analyze(
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com",
+        timeout=50.0,
     )
 
     chunks = _split_transcript(transcript)
