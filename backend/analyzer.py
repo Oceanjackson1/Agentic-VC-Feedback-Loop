@@ -82,7 +82,7 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
 # ── 文本分段 ──────────────────────────────────────────
 
-_MAX_INPUT_CHARS = 8000
+_MAX_INPUT_CHARS = 15000
 _OVERLAP_CHARS = 500
 
 
@@ -119,7 +119,7 @@ def _call_deepseek(client: OpenAI, prompt: str, scenario_id: str) -> list[dict]:
         resp = client.chat.completions.create(
             model="deepseek-chat",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=4096,
+            max_tokens=8192,
             stream=False,
         )
         raw = resp.choices[0].message.content or ""
