@@ -68,14 +68,18 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
 
     scenario = get_scenario(scenario_id)
 
+    valid_items = []
     for i, item in enumerate(data):
         if not isinstance(item, dict):
-            raise ValueError(f"第 {i + 1} 项不是对象")
-        missing = scenario.REQUIRED_FIELDS - set(item.keys())
-        if missing:
-            raise ValueError(f"第 {i + 1} 项缺少字段: {missing}")
+            logger.warning(f"第 {i + 1} 项不是对象，跳过")
+            continue
 
-        # 校验嵌套调整字段
+        # 补充缺失字段为空值，而不是拒绝
+        for field in scenario.REQUIRED_FIELDS:
+            if field not in item:
+                item[field] = ""
+
+        # 补充嵌套调整字段
         adj_key = None
         for key in ("required_adjustments", "required_preparation", "follow_up"):
             if key in scenario.REQUIRED_FIELDS:
@@ -85,10 +89,15 @@ def _validate_result(raw: str, scenario_id: str) -> list[dict]:
         if adj_key:
             adj = item.get(adj_key)
             if not isinstance(adj, dict):
-                raise ValueError(f"第 {i + 1} 项 {adj_key} 必须是对象")
+                item[adj_key] = {}
+                adj = item[adj_key]
             for k in scenario.REQUIRED_ADJUSTMENT_FIELDS:
                 if k not in adj:
-                    raise ValueError(f"第 {i + 1} 项 {adj_key} 缺少 {k}")
+                    adj[k] = ""
+
+        valid_items.append(item)
+
+    return valid_items if valid_items else data
 
     return data
 

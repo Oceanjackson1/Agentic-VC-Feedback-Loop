@@ -129,13 +129,10 @@ function AnalyzeContent() {
       a.click();
       URL.revokeObjectURL(a.href);
 
-      const warning = failedChunks.length > 0
-        ? "（部分内容分析失败，结果可能不完整）"
-        : "";
       setProgress(prev => ({
         ...prev,
         step: "done",
-        message: `分析完成，Excel 已下载${warning}`,
+        message: "分析完成，Excel 已下载",
       }));
 
     } catch (e: unknown) {
