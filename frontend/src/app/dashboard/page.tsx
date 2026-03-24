@@ -1,27 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { ScenarioCard } from "@/components/ScenarioCard";
-import { fetchScenarios, ScenarioMeta } from "@/lib/api";
+import { ScenarioMeta } from "@/lib/api";
+
+const SCENARIOS: ScenarioMeta[] = [
+  { id: "vc_pitch", name_zh: "VC Pitch 反馈", name_en: "VC Pitch Feedback", description_zh: "分析投资人与创始团队的对话，提取核心问题与改进建议", description_en: "Analyze investor-founder conversations for key questions and improvements", icon: "chart-bar" },
+  { id: "ecommerce_b2b", name_zh: "电商 B2B 对谈", name_en: "E-commerce B2B", description_zh: "分析采购方与供应商的订单谈判对话，提取关键诉求与改进建议", description_en: "Analyze buyer-supplier negotiations for key demands and improvements", icon: "shopping-cart" },
+  { id: "interview", name_zh: "面试分析", name_en: "Interview Analysis", description_zh: "分析面试官与候选人的对话，评估回答质量与改进建议", description_en: "Analyze interviewer-candidate dialogues for response quality and improvements", icon: "user-check" },
+  { id: "meeting_summary", name_zh: "会议总结", name_en: "Meeting Summary", description_zh: "结构化会议纪要，提取关键决策、行动项与待跟进事项", description_en: "Generate structured meeting minutes with decisions, action items and follow-ups", icon: "clipboard-list" },
+];
 
 export default function DashboardPage() {
   const { user, loading, logout } = useAuth();
   const router = useRouter();
-  const [scenarios, setScenarios] = useState<ScenarioMeta[]>([]);
 
   useEffect(() => {
     if (!loading && !user) {
       router.push("/");
     }
   }, [user, loading, router]);
-
-  useEffect(() => {
-    fetchScenarios()
-      .then(setScenarios)
-      .catch(console.error);
-  }, []);
 
   if (loading || !user) return null;
 
@@ -63,7 +63,7 @@ export default function DashboardPage() {
         <p className="text-text-secondary mb-10">选择最匹配你对话内容的场景，AI 将提供针对性的专业分析。</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {scenarios.map((s) => (
+          {SCENARIOS.map((s) => (
             <ScenarioCard
               key={s.id}
               scenario={s}

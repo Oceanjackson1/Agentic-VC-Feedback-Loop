@@ -16,7 +16,11 @@ export default function Home() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // 已登录用户可以浏览首页，通过 header "进入看板" 按钮进入 dashboard
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/dashboard");
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
