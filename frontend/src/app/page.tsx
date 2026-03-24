@@ -67,7 +67,16 @@ export default function Home() {
         <p className="text-xl md:text-2xl text-text-secondary font-normal leading-relaxed mb-10 max-w-2xl">
           旨在大幅提升您的生产力，是 AI 配合业务的最佳方式。
         </p>
-        <GoogleLoginButton variant="hero" />
+        {user ? (
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="px-8 py-3.5 rounded-full bg-text text-bg font-semibold text-sm hover:bg-text/90 transition-colors"
+          >
+            进入看板 →
+          </button>
+        ) : (
+          <GoogleLoginButton variant="hero" />
+        )}
       </section>
 
       {/* ── 四大场景 ── */}
@@ -137,7 +146,16 @@ export default function Home() {
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>中英文 Excel 导出</li>
               <li className="flex items-start gap-2"><span className="text-accent mt-0.5">✓</span>每日限额分析次数</li>
             </ul>
-            <GoogleLoginButton variant="hero" />
+            {user ? (
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-full py-3 rounded-full bg-text text-bg font-medium text-sm hover:bg-text/90 transition-colors"
+              >
+                进入看板
+              </button>
+            ) : (
+              <GoogleLoginButton variant="hero" />
+            )}
           </div>
 
           {/* Monthly */}
